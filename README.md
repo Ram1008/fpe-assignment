@@ -7,12 +7,14 @@ A desktop web application (`localhost:3000`) where users interact with an AI age
 ## 🚀 Key Features
 
 1. **Natural Language Interface**: Users describe targeting rules (e.g. *"Target high value customers in the US aged 25 or older"*), and the AI agent evaluates available metadata to construct the decision tree.
-2. **Deterministic Decision Tree Engine**: The LLM emits structured tool calls (`ADD_SEGMENT`, `ADD_ATTRIBUTE`, `REMOVE_NODE`, `REPLACE_NODE`, `ADD_BOOLEAN_GROUP`, `REQUEST_CLARIFICATION`, `VALIDATE_TREE`, `FINISH`). Structural tree mutations are performed deterministically by the Python backend using UUID node addressing.
-3. **Live Recursive Visualizer**: Displays `AND` (Sky Blue) and `OR` (Amber) boolean group containers, segment chips, and attribute predicate chips in real time, with an optional AST JSON view.
-4. **Hybrid Async Bootstrapping & 24-Hour Cache**: Segment keys are discovered from paginated `/v1/users` records and cached in SQLite with a 24-hour TTL. Hot path tree building makes **0 Users API calls**. Expiry triggers incremental sync via `/v1/users/changes`.
-5. **Validator-Driven Submission**: Integrates with the server-side Validator API (`/v1/validate`). Only a passing tree can be finalized, generating `final_tree.json` and `validation_report.json` in the project root directory.
-6. **Persistence & App Restart Recovery**: Conversation threads, chat messages, tree AST snapshots, and metadata caches are stored in SQLite (`app_data.db`), enabling seamless app restart recovery without re-bootstrapping.
-7. **Structured Observability**: Emits JSON-L event logs to `events.log` with `trace_id`, `latency_ms`, and `cache_hit` for full execution traceability.
+2. **Multi-LLM Provider Support (OpenRouter / Claude / OpenAI)**: Calibrated for OpenRouter as the primary LLM provider gateway, with automatic fallback cascading to Anthropic Claude API, OpenAI-compatible endpoints, and a deterministic offline heuristic engine. Supports both flat and nested tool call payloads seamlessly.
+3. **Deterministic Decision Tree Engine**: The LLM emits structured tool calls (`ADD_SEGMENT`, `ADD_ATTRIBUTE`, `REMOVE_NODE`, `REPLACE_NODE`, `ADD_BOOLEAN_GROUP`, `REQUEST_CLARIFICATION`, `VALIDATE_TREE`, `FINISH`). Structural tree mutations are performed deterministically by the Python backend using UUID node addressing.
+4. **Live Recursive Visualizer**: Displays `AND` (Sky Blue) and `OR` (Amber) boolean group containers, segment chips (Emerald), and attribute predicate chips (Purple) in real time, with an AST JSON view.
+5. **Full Chat Clipboard Copying**: Easily copy complete conversation history threads or individual message bubbles directly to the clipboard via the top-bar Copy Chat controls.
+6. **Hybrid Async Bootstrapping & 24-Hour Cache**: Segment keys are discovered from paginated `/v1/users` records and cached in SQLite with a 24-hour TTL. Hot path tree building makes **0 Users API calls**. Expiry triggers incremental sync via `/v1/users/changes`.
+7. **Validator-Driven Submission**: Integrates with the server-side Validator API (`/v1/validate`). Only a passing tree can be finalized, generating `final_tree.json` and `validation_report.json` in the project root directory.
+8. **Persistence & App Restart Recovery**: Conversation threads, chat messages, tree AST snapshots, and metadata caches are stored in SQLite (`app_data.db`), enabling seamless app restart recovery without re-bootstrapping.
+9. **Structured Observability**: Emits JSON-L event logs to `events.log` with `trace_id`, `latency_ms`, and `cache_hit` for full execution traceability.
 
 ---
 
@@ -22,7 +24,7 @@ A desktop web application (`localhost:3000`) where users interact with an AI age
 +---------------------------------------------------------------------------------------+
 |                                    React Desktop UI                                   |
 |   +-----------------------+   +----------------------------+   +------------------+   |
-|   |    Chat Interface     |   | Live Tree Visualizer (Tree)|   | Validation Panel |   |
+|   | Chat & Copy Interface |   | Live Tree Visualizer (Tree)|   | Validation Panel |   |
 |   +-----------------------+   +----------------------------+   +------------------+   |
 +-------------------------------------------|-------------------------------------------+
                                             | REST API (HTTP)
@@ -30,7 +32,7 @@ A desktop web application (`localhost:3000`) where users interact with an AI age
 |                                  FastAPI Backend Server                               |
 |   +-------------------+   +-------------------+   +--------------------+              |
 |   | Agent Orchestrator|   | Decision Tree     |   | Cache Service      |              |
-|   | (Anthropic SDK)   |   | Engine            |   | (24h TTL + Sync)   |              |
+|   | (OpenRouter/Claude|   | Engine            |   | (24h TTL + Sync)   |              |
 |   +-------------------+   +-------------------+   +--------------------+              |
 |                                       |                                               |
 |   +-----------------------------------v-------------------------------------------+   |
@@ -39,7 +41,8 @@ A desktop web application (`localhost:3000`) where users interact with an AI age
 +-------------------------------------------|-------------------------------------------+
                                             | Outbound HTTP Requests (httpx)
 +-------------------------------------------v-------------------------------------------+
-|  Users API (/v1/users) | Attributes API (/v1/attributes) | Validator API (/v1/validate)|
+| Users API (/v1/users) | Attributes API (/v1/attributes) | Validator API (/v1/validate) |
+| Multi-LLM Gateway: OpenRouter.ai (openai/gpt-4o-mini) / Anthropic Claude / OpenAI     |
 +---------------------------------------------------------------------------------------+
 ```
 
@@ -50,7 +53,7 @@ A desktop web application (`localhost:3000`) where users interact with an AI age
 ### Prerequisites
 - Python 3.11+
 - Node.js 18+
-- Bearer Token & Anthropic API Key (optional fallback heuristic included)
+- OpenRouter API Key (or Anthropic / OpenAI API key; deterministic offline fallback included)
 
 ### Installation
 ```bash
@@ -58,21 +61,24 @@ make install
 ```
 
 ### Configuration
-Copy `.env.example` to `.env` and fill in your API tokens:
+Copy `.env.example` to `.env` and configure your API key:
 ```bash
 cp .env.example .env
 ```
 Edit `.env`:
 ```env
-BEARER_TOKEN=
-OPEN_ROUTER_API_KEY= 
+BEARER_TOKEN=b27cb2b3-b097-4088-847d-9681d2a401b2
 BASE_API_URL=https://dt-agent-support.divyanshgolyan.workers.dev
+OPEN_ROUTER_API_KEY=sk-or-v1-your_openrouter_api_key_here
+OPENROUTER_MODEL=openai/gpt-4o-mini
 ```
 
 ### Running the Application
 Launch both backend and frontend development servers concurrently:
 ```bash
 make run
+# OR
+python run_dev.py
 ```
 Access the application in your browser at: **`http://localhost:3000`**
 
@@ -91,7 +97,7 @@ make test
 
 ```
 .
-├── DESIGN.md                 # Alias pointing to design.md
+├── .gitignore                # Git ignore rules for DB, env, logs & build outputs
 ├── Makefile                  # Build, run, test automation harness
 ├── README.md                 # Project documentation
 ├── backend_design.md         # Detailed backend design specification
@@ -115,3 +121,4 @@ make test
     ├── package.json          # Frontend dependencies
     └── vite.config.ts        # Vite configuration & proxy settings
 ```
+

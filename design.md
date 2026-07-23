@@ -2,7 +2,7 @@
 
 **Project Name:** AI Decision-Tree Agent  
 **Target Platform:** Desktop Web Application (`localhost:3000`)  
-**Document Version:** 1.0.0  
+**Document Version:** 1.1.0  
 **Target Audience:** Human Engineers & Autonomous AI Verification Agents  
 
 ---
@@ -11,19 +11,20 @@
 
 The **AI Decision-Tree Agent** is a desktop web application enabling users to construct, edit, validate, and finalize boolean targeting decision trees for marketing campaigns, feature flags, and A/B test targeting via natural language interaction.
 
-The system integrates an LLM (Anthropic Claude) with a **deterministic local Decision Tree Engine**. The LLM acts solely as a reasoning engine emitting structured actions; it does **not** maintain application state or directly mutate tree structures. All structural mutations, caching, persistence, and schema validations are performed deterministically by the Python/FastAPI backend and local tree engine.
+The system integrates a **Multi-LLM Provider Gateway (OpenRouter / Anthropic Claude / OpenAI / Offline Heuristic)** with a **deterministic local Decision Tree Engine**. The LLM acts solely as a reasoning engine emitting structured actions; it does **not** maintain application state or directly mutate tree structures. All structural mutations, caching, persistence, and schema validations are performed deterministically by the Python/FastAPI backend and local tree engine.
 
 ### Key Deliverables & Artifacts
-1. **Desktop Web App (`localhost:3000`)**: Interactive chat interface, live recursive decision tree visualization, cache status progress indicator, and a "Validate & Submit" workflow.
-2. **Persistence & Cache**: Local SQLite storage preserving conversation history, tree revisions, and discovered metadata across application restarts. Uses hybrid async bootstrapping and incremental sync (`/v1/users/changes`).
-3. **Exported Artifacts**: `final_tree.json` and `validation_report.json` emitted upon successful validation and user submit action, plus optional structured JSON-L logs (`events.log`).
+1. **Desktop Web App (`localhost:3000`)**: Interactive chat interface with full-thread clipboard copying, live recursive decision tree visualization, cache status progress indicator, and a "Validate & Submit" workflow.
+2. **Multi-LLM Priority Cascade**: Calibrated to use OpenRouter.ai as the primary LLM provider (model `openai/gpt-4o-mini`), cascading to Anthropic Claude, OpenAI-compatible APIs, and a deterministic offline heuristic engine. Supports both nested (`payload: {...}`) and flat tool call arguments.
+3. **Persistence & Cache**: Local SQLite storage preserving conversation history, tree revisions, and discovered metadata across application restarts. Uses hybrid async bootstrapping and incremental sync (`/v1/users/changes`).
+4. **Exported Artifacts**: `final_tree.json` and `validation_report.json` emitted upon successful validation and user submit action, plus structured JSON-L logs (`events.log`).
 
 ---
 
 ## 2. Core Architectural Principles & Boundaries
 
 1. **LLM Does Not Own Application State**: The tree state is stored in SQLite and managed in memory by a deterministic `TreeEngine`. The LLM receives the current state as context in its prompt and responds exclusively with **Agent Actions** (Tool Calls / Structured JSON). Node mutation targets strictly use UUID-based `node_id`.
-2. **Deterministic Tree Mutations**: All additions, replacements, deletions, and boolean groupings are executed by the `TreeEngine` Python class with strict type checks and UUID node addressing.
+2. **Deterministic Tree Mutations & Boundary Clamping**: All additions, replacements, deletions, and boolean groupings are executed by the `TreeEngine` Python class with strict type checks and UUID node addressing. Numeric values (e.g. `account_age_days`) are clamped to validator limits ($\le 10,000$).
 3. **Cache-First Architecture & Hybrid Async Bootstrapping**:
    - Attribute definitions (`/v1/attributes`) and discovered segment keys (`/v1/users`) are cached in SQLite with a 24-hour TTL.
    - On startup, if a valid cache exists, server starts immediately (**0 Users API requests**).
@@ -40,7 +41,7 @@ The system integrates an LLM (Anthropic Claude) with a **deterministic local Dec
 +---------------------------------------------------------------------------------------+
 |                                    React Desktop UI                                   |
 |   +-----------------------+   +----------------------------+   +------------------+   |
-|   |    Chat Interface     |   | Live Tree Visualizer (Tree)|   | Validation Panel |   |
+|   | Chat & Copy Interface |   | Live Tree Visualizer (Tree)|   | Validation Panel |   |
 |   +-----------------------+   +----------------------------+   +------------------+   |
 +-------------------------------------------|-------------------------------------------+
                                             | REST API / Event Stream (HTTP)
@@ -54,7 +55,7 @@ The system integrates an LLM (Anthropic Claude) with a **deterministic local Dec
 |                       v                       v                       v               |
 |            +--------------------+   +-------------------+   +--------------------+    |
 |            | Agent Orchestrator |   | Decision Tree     |   | Cache Service      |    |
-|            | (Anthropic SDK)    |   | Engine            |   | (TTL 24h)          |    |
+|            | (OpenRouter/LLM)   |   | Engine            |   | (TTL 24h)          |    |
 |            +--------------------+   +-------------------+   +--------------------+    |
 |                                               |                       |               |
 |                                               v                       |               |
@@ -68,13 +69,13 @@ The system integrates an LLM (Anthropic Claude) with a **deterministic local Dec
 +-------------------------------------------|-------------------------------------------+
                                             | Outbound HTTP Requests (httpx)
 +-------------------------------------------v-------------------------------------------+
-|                               External APIs & LLM Provider                            |
+|                               External APIs & LLM Providers                           |
 |  +-----------------------+    +-----------------------+    +-----------------------+  |
 |  | Users API             |    | Attributes API        |    | Validator API         |  |
 |  | /v1/users             |    | /v1/attributes        |    | /v1/validate          |  |
 |  +-----------------------+    +-----------------------+    +-----------------------+  |
 |  +---------------------------------------------------------------------------------+  |
-|  | Anthropic Claude API (claude-3-5-sonnet / tool_use)                             |  |
+|  | OpenRouter.ai API (openai/gpt-4o-mini) -> Anthropic Claude -> OpenAI -> Fallback   |  |
 |  +---------------------------------------------------------------------------------+  |
 +---------------------------------------------------------------------------------------+
 ```

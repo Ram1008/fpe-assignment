@@ -2,16 +2,16 @@
 
 **Project Name:** AI Decision-Tree Agent (Backend)  
 **Target Platform:** Python 3.11+ / FastAPI Server  
-**Tech Stack:** FastAPI, Pydantic v2, Anthropic SDK (`anthropic`), SQLite (`sqlite3` / `aiosqlite`), httpx, Pytest  
+**Tech Stack:** FastAPI, Pydantic v2, OpenRouter API (`httpx`), Anthropic SDK (`anthropic`), SQLite (`sqlite3` / `aiosqlite`), Pytest  
 
 ---
 
 ## 1. Overview & Service Boundaries
 
-The backend service is a deterministic Python/FastAPI server responsible for orchestrating conversation state, executing Anthropic LLM reasoning calls, mutating decision trees via the `TreeEngine`, maintaining SQLite persistence, managing a 24-hour API metadata cache, and communicating with external APIs (`Users`, `Attributes`, `Validator`).
+The backend service is a deterministic Python/FastAPI server responsible for orchestrating conversation state, executing Multi-LLM reasoning calls (OpenRouter / Anthropic / OpenAI / Heuristic Fallback), mutating decision trees via the `TreeEngine`, maintaining SQLite persistence, managing a 24-hour API metadata cache, and communicating with external APIs (`Users`, `Attributes`, `Validator`).
 
 ### Core Design Goal
-The backend guarantees that **LLM outputs never directly mutate application state**. The LLM is restricted to emitting validated `AgentAction` objects (via Anthropic Tool Use). The backend `TreeEngine` validates these actions against cached metadata and applies exact structural mutations.
+The backend guarantees that **LLM outputs never directly mutate application state**. The LLM is restricted to emitting validated `AgentAction` objects (via Tool Use). The backend `TreeEngine` validates these actions against cached metadata and applies exact structural mutations, clamping values like `account_age_days <= 10000` to satisfy server-side validator constraints.
 
 ---
 
@@ -21,7 +21,7 @@ The backend guarantees that **LLM outputs never directly mutate application stat
 backend/
 ├── app/
 │   ├── main.py                    # FastAPI entrypoint, middleware, CORS setup
-│   ├── config.py                  # Pydantic BaseSettings (.env variables, API tokens)
+│   ├── config.py                  # Pydantic BaseSettings (.env variables, API tokens, .strip())
 │   ├── api/                       # REST Routers
 │   │   ├── conversations.py       # Chat & state management endpoints
 │   │   ├── validation.py          # Tree validation & export endpoints
@@ -31,7 +31,7 @@ backend/
 │   │   ├── models.py              # Pydantic schemas (TreeNode, AgentAction, etc.)
 │   │   └── validator_serializer.py# Transforms internal tree AST to Validator JSON
 │   ├── services/                  # Business Logic Services
-│   │   ├── agent_orchestrator.py  # Anthropic SDK tool calling & prompt builder
+│   │   ├── agent_orchestrator.py  # Multi-LLM provider orchestrator (OpenRouter/Claude/OpenAI)
 │   │   ├── conversation_service.py# Session & message management
 │   │   ├── cache_service.py       # TTL 24h caching manager & SQLite sync
 │   │   ├── persistence_service.py # SQLite connection & transaction manager
@@ -174,7 +174,7 @@ class TreeEngine:
             return True
         return False
 
-    def serialize_for_validator((self) -> Dict:
+    def serialize_for_validator(self) -> Dict:
         def _strip_ids(node: TreeNodeModel) -> Dict:
             if node.type in [NodeType.AND, NodeType.OR]:
                 return {
@@ -212,25 +212,34 @@ class TreeEngine:
 
 ---
 
-## 6. Prompt Engineering & Anthropic Tool Definition
+## 6. Prompt Engineering & Multi-LLM Provider Cascade
 
-The `AgentOrchestrator` uses Anthropic SDK (`anthropic.Anthropic()`) with explicit Tool definitions.
+The `AgentOrchestrator` implements a priority routing cascade:
+1. **OpenRouter API Gateway**: Recommended primary provider using `openai/gpt-4o-mini`.
+2. **Anthropic Claude API**: Direct SDK provider (`claude-3-5-sonnet`).
+3. **OpenAI-Compatible API**: Direct REST API endpoint provider.
+4. **Deterministic Heuristic Engine**: Offline fallback engine for local offline testing.
+
+### Header & Tool Payload Safety Features:
+- **String Sanitization**: All API keys and authorization headers are passed through `.strip()` to prevent HTTP header validation errors caused by trailing newlines in `.env`.
+- **Dual Format Payload Parsing**: Tool argument parser accepts both nested payload schemas (`args["payload"]`) and flat payload schemas (`args["attribute"]`, `args["segment_key"]`).
+- **Value Boundary Safety**: Prompt Directive 5 enforces `account_age_days <= 10000` clamping to satisfy server-side validator limits.
 
 ### System Prompt Structure
 
 ```markdown
 You are an expert AI Decision-Tree Agent constructing audience targeting boolean logic.
 
-STRICT CONSTRAINTS:
+STRICT OPERATIONAL DIRECTIVES:
 1. You DO NOT mutate application state directly. You MUST call tools (Agent Actions) to edit the decision tree.
 2. Available Segments: {known_segments_list}
 3. Available Attributes & Operators: {known_attributes_json}
 4. Current Decision Tree: {current_tree_json}
+5. Value Boundaries: Attribute `account_age_days` MUST NOT exceed 10000. Clamp values if user specifies years (> 10000 days).
 
 RULES:
 - If a user asks for an ambiguous segment (e.g. "recent buyers"), call tool `REQUEST_CLARIFICATION` asking for clarification.
 - If a user requests a segment or attribute not in the available catalog, call tool `REQUEST_CLARIFICATION` pushing back and suggesting alternatives.
-- Do NOT guess segment names or attribute operators.
 ```
 
 ### Anthropic Tool Definition

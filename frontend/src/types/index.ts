@@ -34,8 +34,36 @@ export interface ChatMessage {
 
 export interface ValidationReport {
   ok: boolean;
-  errors?: Array<{ path: string; code: string; message: string }>;
+  errors?: Array<{ path: string; code: string; message: string; actionable_recommendation?: string }>;
   warnings?: string[];
+  summary?: {
+    status: string;
+    validated_at: string;
+    validator_service: string;
+    segments_cache_timestamp: string;
+    ast_metrics?: {
+      total_nodes: number;
+      tree_depth: number;
+      node_counts: {
+        boolean_groups: { OR: number; AND: number; total: number };
+        segments: number;
+        attributes: number;
+      };
+    };
+  };
+  structure_analysis?: any;
+  diagnostics?: {
+    errors_count: number;
+    errors: Array<{ path: string; code: string; message: string; actionable_recommendation?: string }>;
+    warnings_count: number;
+    warnings: string[];
+  };
+  recommendations_and_insights?: Array<{
+    category: string;
+    level: string;
+    title: string;
+    details: string;
+  }>;
 }
 
 export interface CacheStatus {

@@ -11,10 +11,10 @@
 The frontend application provides a sleek, modern, desktop-optimized web workspace where users interact with an AI Decision-Tree Agent. It visualizes the boolean decision tree in real-time as natural language instructions are processed.
 
 ### Key UI Features
-1. **Interactive Chat Panel**: Full conversational history with message bubbles, agent action badges (`ADD_SEGMENT`, `ADD_ATTRIBUTE`, etc.), and clarifying question dialogs.
-2. **Live Decision Tree Visualizer**: Recursive component rendering boolean operators (`AND`, `OR`), segment cards, and attribute predicate cards with interactive controls (edit, delete, re-order).
-3. **Validation & Submission Bar**: Displays real-time validator readiness, error/warning diagnostics from `/v1/validate`, and a single-click "Validate & Export" button.
-4. **Session History Drawer**: Allows loading, starting, or deleting past tree editing sessions from SQLite.
+1. **Interactive Chat & Copy Panel**: Full conversational history with message bubbles, agent action badges (`ADD_SEGMENT`, `ADD_ATTRIBUTE`, etc.), clarifying question dialogs, and a top-bar **Copy Chat** control to copy complete thread transcripts or single messages to clipboard.
+2. **Live Decision Tree Visualizer**: Recursive component rendering boolean operators (`AND` Sky Blue, `OR` Amber), segment cards (Emerald), and attribute predicate cards (Purple) with interactive controls (edit, delete, re-order).
+3. **Validation & Submission Bar**: Displays real-time validator readiness, error/warning diagnostics from `/v1/validate`, and a single-click "Validate & Export" button emitting `final_tree.json` and `validation_report.json`.
+4. **Session History Drawer & Cache Badge**: Live 24h TTL cache status badge with manual refresh button, session switcher, and new tree initializer.
 
 ---
 
@@ -23,16 +23,15 @@ The frontend application provides a sleek, modern, desktop-optimized web workspa
 ```
 AppShell (Layout Wrapper)
 ├── HeaderBar (App title, API status, Cache TTL indicator, Session switcher)
-├── MainWorkspace (Grid Layout: 40% Chat / 60% Tree Preview)
+├── MainWorkspace (Grid Layout: 440px Chat / Flex Tree Preview)
 │   ├── ChatContainer
-│   │   ├── ConversationHeader
+│   │   ├── ChatHeaderBar (Title, msg counter, Copy Chat button)
 │   │   ├── MessageList
-│   │   │   ├── UserMessageBubble
-│   │   │   ├── AgentMessageBubble (Markdown render + Action Tag)
-│   │   │   └── ClarificationPromptCard (Select options / Type answer)
-│   │   └── ChatInputArea (Textarea + Send Button + Voice/Quick Prompts)
+│   │   │   ├── UserMessageBubble (Copy button on hover)
+│   │   │   ├── AgentMessageBubble (Markdown render + Action Tag + Copy button)
+│   │   │   └── ClarificationModal (Select options / Type answer)
+│   │   └── ChatInputArea (Textarea + Send Button + Quick Prompts)
 │   └── TreePreviewPanel
-│       ├── TreeToolbar (Expand/Collapse All, Layout Toggle, Clear Tree)
 │       ├── RecursiveTreeCanvas (Renders root BooleanNode)
 │       │   └── TreeNodeComponent (Recursive)
 │       │       ├── BooleanGroupCard (AND / OR with color codes)
@@ -41,7 +40,7 @@ AppShell (Layout Wrapper)
 │       └── ValidationFooterPanel
 │           ├── StatusBadge (Valid / Invalid / Pending)
 │           ├── ErrorWarningList (Expandable drawer showing paths & messages)
-│           └── SubmitExportButton (Triggers final_tree.json download)
+│           └── SubmitExportButton (Triggers final_tree.json export)
 ```
 
 ---

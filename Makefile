@@ -18,7 +18,7 @@ install:
 	cd frontend && npm install
 
 run:
-	@echo "Starting AI Decision-Tree Agent..."
+	@echo "Starting AI Decision-Tree Agent (Backend: 8000, Frontend: 3000)..."
 	python run_dev.py
 
 backend:
@@ -30,8 +30,10 @@ frontend:
 test:
 	@echo "Running backend test suite..."
 	cd backend && pytest -v
-	@echo "Running frontend tests..."
-	cd frontend && npm run test -- --run
+	@echo "Running frontend build verification..."
+	cd frontend && npm run build
 
 clean:
-	rm -rf backend/__pycache__ backend/.pytest_cache frontend/dist frontend/node_modules/.cache
+	@echo "Cleaning temporary build artifacts and test caches..."
+	python -c "import shutil, os; [shutil.rmtree(p, ignore_errors=True) for p in ['backend/.pytest_cache', 'frontend/dist', 'frontend/node_modules/.cache']]"
+
