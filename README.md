@@ -2,6 +2,18 @@
 
 A desktop web application (`localhost:3000`) where users interact with an AI agent to build, edit, validate, and export boolean targeting decision trees for marketing campaigns, feature flags, or A/B testing.
 
+## Explore the project
+
+- **Problem:** turn natural-language targeting rules into an explicit, editable decision tree.
+- **Engineering focus:** structured AI actions, deterministic tree mutations, and validator-driven submission.
+- **Architecture:** [backend design](backend_design.md) · [frontend design](frontend_design.md).
+- **Try locally:** follow the setup below; configure your own service credentials.
+
+### Suggested walkthrough
+
+Create a conversation, add a segment and an attribute rule, inspect the resulting AND/OR tree, then validate and export it. External API and model-provider operations require configured services.
+
+
 ---
 
 ## 🚀 Key Features
@@ -67,7 +79,7 @@ cp .env.example .env
 ```
 Edit `.env`:
 ```env
-BEARER_TOKEN=b27cb2b3-b097-4088-847d-9681d2a401b2
+BEARER_TOKEN=your_support_api_token
 BASE_API_URL=https://dt-agent-support.divyanshgolyan.workers.dev
 OPEN_ROUTER_API_KEY=sk-or-v1-your_openrouter_api_key_here
 OPENROUTER_MODEL=openai/gpt-4o-mini
