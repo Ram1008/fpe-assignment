@@ -1,5 +1,5 @@
 import uuid
-from typing import Optional, List, Dict, Any, Union
+from typing import Optional, List, Dict, Any, Union, Literal
 from app.domain.models import (
     TreeNodeModel, BooleanNodeModel, SegmentNodeModel, AttributeNodeModel, NodeType
 )
